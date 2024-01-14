@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>货种管理</title>
+    <style>
+        .current-page-number{
+            color: red;
+        }
+        ul{
+            list-style-type: none;
+            padding: 0;
+        }
+        li{
+            display: inline-block;
+            margin: 3px;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="/scripts/fetch-page-numbers.js"></script>
+
+    <script>
+        var PAGE_SIZE=2
+        var latestCallQueryFunctionName=''
+        //写类按钮按下后，业务成功后，重新来一遍最近的查询，这是policyAfterWriteButtonClicked的用途，此函数需要借助全局变量latestCallQueryFunctionName
+        function policyAfterWriteButtonClicked(){
+            if(latestCallQueryFunctionName=='queryByKeywordAndDisplaySpecifiedPage'){
+                queryByKeywordAndDisplaySpecifiedPage(1)
+            }
+            if(latestCallQueryFunctionName=='queryByCommodityId'){
+                queryByCommodityId()
+            }
+        }
+        function prepareSureDeleteWindow(cid){
+            document.getElementById("ready-delete-cid").innerText=cid
+
+        }
+        function prepareModifyWindow(cid){
+            document.getElementById("ready-modify-cid").innerText=cid
+        }
+        function modifyRecord(){
+            let cid=document.getElementById("ready-modify-cid").innerText
+            let new_name=$("#new_name").val()
+            let new_price=$("#new_price").val()
+            let new_name_null=false
+            let new_price_null=false
+            if(new_name==null||new_name==""){
+                new_name_null=true
+            }
+            if(new_price==null||new_price==""){
+                new_price_null=true
+            }
+            if(new_name_null&&new_price_null){
+                alert("新单价和新品名都为空，请重试")
+                return
+            }
+            if(new_price_null==false){
+                if(isNaN(parseFloat(new_price))){
+                    alert("输入非数字，请重试")
+                    return
+                }
+                //让输入0.99的不合法
+                if(Math.floor(parseFloat(new_price))<1){
+                    alert("输入值应>=1")
+                    return
+                }
+                new_price=Math.floor(new_price)
+            }
+            $.post("/commodity/modify",{cid:cid,name:new_name,unit_price:new_price},function(json){
+                alert(json)
+                json=JSON.parse(json)
+                if(json.success==true){
+                    policyAfterWriteButtonClicked()
+                }
+            })
+        }
+        function deleteRecord(){
+            let cid=document.getElementById("ready-delete-cid").innerText
+            $.post("/commodity/delete",{cid:cid},function(json){
+                alert(json)
+                json=JSON.parse(json)
+                if(json.success==true){
+                    policyAfterWriteButtonClicked()
+                }
+
+            })
+        }
+        function insertRecord(){
+            let new_name=$("#insert_name").val()
+            let new_price=$("#insert_price").val()
+            let new_name_not_null=(new_name!=null)&&(new_name!="")
+            let new_price_not_null=(new_price!=null)&&(new_price!="")
+            if(new_name_not_null&&new_price_not_null){
+                if(isNaN(parseFloat(new_price))){
+                    alert("输入非数字，请重试")
+                    return
+                }
+                //让输入0.99的不合法
+                if(Math.floor(parseFloat(new_price))<1){
+                    alert("输入值应>=1")
+                    return
+                }
+                new_price=Math.floor(new_price)
+                $.post("/commodity/insert",{name:new_name,unit_price:new_price},function(json){
+                    alert(json)
+                })
+            }else{
+                alert("货名和单价必须全部填写")
+            }
+        }
+        function queryByKeywordAndDisplaySpecifiedPage(currentPageNum){
+            let keyword=$("#keyword").val()
+            $.post("/commodity/select_by_keyword",
+                {keyword:keyword,currentPageNumber:currentPageNum,pageSize:PAGE_SIZE},
+                function(json){
+                json=JSON.parse(json)
+                if(json.hasOwnProperty("message")){
+                    alert(json.message)
+                    return
+                }
+                let pageNumbers=fetch_page_numbers(currentPageNum,json.pageQuantity)
+                let pageNumsUl=document.getElementsByClassName("page-numbers-ul")[0]
+                while(pageNumsUl.firstChild){
+                    pageNumsUl.removeChild(pageNumsUl.firstChild)
+                }
+                for(let pageNumber of pageNumbers){
+                    let li=document.createElement("li")
+                    let a=document.createElement("a")
+                    if(pageNumber==currentPageNum){
+                        a.setAttribute("class","current-page-number")
+                    }
+                    a.innerText=pageNumber
+                    a.addEventListener('click',function(){queryByKeywordAndDisplaySpecifiedPage(pageNumber)})
+                    li.appendChild(a)
+                    pageNumsUl.appendChild(li)
+                }
+                display_table_rows(json)
+                latestCallQueryFunctionName='queryByKeywordAndDisplaySpecifiedPage'
+                }
+            )
+        }
+        function queryByCommodityId(){
+            let cid=$("#enter_cid").val()
+            if(isNaN(parseFloat(cid))){
+                alert("输入非数字，请重试")
+                return
+            }
+            //让输入0.99的不合法
+            if(Math.floor(parseFloat(cid))<1){
+                alert("输入值应>=1")
+                return
+            }
+            $.post("/commodity/select_by_cid",{cid:cid},function(json){
+                json=JSON.parse(json)
+                if(json.hasOwnProperty("message")){
+                    alert(json.message)
+                    return
+                }
+                let pageNumsUl=document.getElementsByClassName("page-numbers-ul")[0]
+                while(pageNumsUl.firstChild){
+                    pageNumsUl.removeChild(pageNumsUl.firstChild)
+                }
+                display_table_rows(json)
+                latestCallQueryFunctionName='queryByCommodityId'
+            })
+
+        }
+        function display_table_rows(pageObj){
+            let listContainerDiv=document.getElementsByClassName("list-container")[0]
+            while(listContainerDiv.firstChild){
+                listContainerDiv.removeChild(listContainerDiv.firstChild)
+            }
+            let tableElem=document.createElement("table")
+            let pageItemsQuantity=pageObj.itemsOfPage.length
+            for(let i=0;i<pageItemsQuantity;i++){
+                let tableRowElem=document.createElement("tr")
+
+                let th_cid=document.createElement("th")
+                th_cid.innerText=pageObj.itemsOfPage[i].cid
+                tableRowElem.appendChild(th_cid)
+
+                let th_name=document.createElement("th")
+                th_name.innerText=pageObj.itemsOfPage[i].name
+                tableRowElem.appendChild(th_name)
+
+                let th_unit_price=document.createElement("th")
+                th_unit_price.innerText=pageObj.itemsOfPage[i].unit_price
+                tableRowElem.appendChild(th_unit_price)
+
+                let deleteButton=document.createElement("button")
+                deleteButton.innerText="删除"
+                deleteButton.setAttribute("data-toggle","modal")
+                deleteButton.setAttribute("data-target","#sure-delete-modal")
+                deleteButton.addEventListener("click",function(){prepareSureDeleteWindow(pageObj.itemsOfPage[i].cid)})
+                tableRowElem.appendChild(deleteButton)
+
+                let modifyButton=document.createElement("button")
+                modifyButton.innerText='修改'
+                modifyButton.setAttribute("data-toggle","modal")
+                modifyButton.setAttribute("data-target","#modify-modal")
+                modifyButton.addEventListener("click",function(){prepareModifyWindow(pageObj.itemsOfPage[i].cid)})
+                tableRowElem.appendChild(modifyButton)
+
+                tableElem.appendChild(tableRowElem)
+            }
+            listContainerDiv.appendChild(tableElem)
+        }
+    </script>
+</head>
+<body>
+ <div class="search-area">
+     <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#search-by-id">
+         按id搜
+     </button>
+     <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#search-by-name-keyword">
+         按货名关键词搜
+     </button>
+
+     <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#insert-modal">
+         增加新记录
+     </button>
+ </div>
+
+ <div class="modal" id="search-by-id">
+     <div class="modal-dialog">
+         <div class="modal-content">
+             <!-- Modal Header -->
+             <div class="modal-header">
+                 <h4 class="modal-title">按货种id搜索记录</h4>
+                 <button type="button" class="close" data-dismiss="modal">&times;</button>
+             </div>
+             <!-- Modal Body -->
+             <div class="modal-body">
+                 <div class="embedded-form">
+                     <label>货种id：</label>
+                     <input type="text" id="enter_cid">
+                     <input type="button" id="by-cid-select-sure" data-dismiss="modal" value="搜索" onclick="queryByCommodityId()">
+                 </div>
+             </div>
+             <!-- Modal Footer -->
+             <div class="modal-footer">
+                 <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+             </div>
+         </div>
+     </div>
+ </div>
+
+ <div class="modal" id="search-by-name-keyword">
+     <div class="modal-dialog">
+         <div class="modal-content">
+             <!-- Modal Header -->
+             <div class="modal-header">
+                 <h4 class="modal-title">按货名关键词搜索记录</h4>
+                 <button type="button" class="close" data-dismiss="modal">&times;</button>
+             </div>
+             <!-- Modal Body -->
+             <div class="modal-body">
+                 <div class="embedded-form">
+                     <label>货名关键词：</label>
+                     <input type="text" id="keyword">
+                     <input type="button" id="by-keyword-select-sure" data-dismiss="modal" onclick="queryByKeywordAndDisplaySpecifiedPage(1)" value="搜索">
+                 </div>
+             </div>
+             <!-- Modal Footer -->
+             <div class="modal-footer">
+                 <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+             </div>
+         </div>
+     </div>
+ </div>
+
+ <div class="modal" id="sure-delete-modal">
+     <div class="modal-dialog">
+         <div class="modal-content">
+             <!-- Modal Header -->
+             <div class="modal-header">
+                 <h4 class="modal-title">删除确认</h4>
+                 <button type="button" class="close" data-dismiss="modal">&times;</button>
+             </div>
+             <!-- Modal Body -->
+             <div class="modal-body">
+                 <div class="embedded-form">
+                     <p>确认删除commodity记录？cid=</p>
+                     <label id="ready-delete-cid"></label>
+                     <input type="button" id="sure-delete-button" data-dismiss="modal" onclick="deleteRecord()" value="确认删除">
+                 </div>
+             </div>
+             <!-- Modal Footer -->
+             <div class="modal-footer">
+                 <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+             </div>
+         </div>
+     </div>
+ </div>
+
+ <div class="modal" id="modify-modal">
+     <div class="modal-dialog">
+         <div class="modal-content">
+             <!-- Modal Header -->
+             <div class="modal-header">
+                 <h4 class="modal-title">修改记录</h4>
+                 <button type="button" class="close" data-dismiss="modal">&times;</button>
+             </div>
+             <!-- Modal Body -->
+             <div class="modal-body">
+                 <div class="embedded-form">
+                     <p id="ready-modify-cid"></p>
+                     <label>货种名改为：</label>
+                     <input type="text" id="new_name">
+                     <label>单价改为：</label>
+                     <input type="text" id="new_price">
+                     <input type="button" id="sure-modify-button" data-dismiss="modal" onclick="modifyRecord()" value="确认修改">
+                 </div>
+             </div>
+             <!-- Modal Footer -->
+             <div class="modal-footer">
+                 <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+             </div>
+         </div>
+     </div>
+ </div>
+
+ <div class="modal" id="insert-modal">
+     <div class="modal-dialog">
+         <div class="modal-content">
+             <!-- Modal Header -->
+             <div class="modal-header">
+                 <h4 class="modal-title">增加记录</h4>
+                 <button type="button" class="close" data-dismiss="modal">&times;</button>
+             </div>
+             <!-- Modal Body -->
+             <div class="modal-body">
+                 <div class="embedded-form">
+                     <label>货种名为：</label>
+                     <input type="text" id="insert_name">
+                     <label>单价为：</label>
+                     <input type="text" id="insert_price">
+                     <input type="button" id="sure-insert-button" data-dismiss="modal" onclick="insertRecord()" value="确认增加">
+                 </div>
+             </div>
+             <!-- Modal Footer -->
+             <div class="modal-footer">
+                 <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+             </div>
+         </div>
+     </div>
+ </div>
+
+
+ <div class="list-container">
+
+ </div>
+
+ <div class="page-num-group-container">
+     <ul class="page-numbers-ul">
+
+     </ul>
+
+ </div>
+
+</body>
+</html>

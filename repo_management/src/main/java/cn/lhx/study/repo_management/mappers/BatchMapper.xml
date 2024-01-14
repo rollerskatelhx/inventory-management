@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.lhx.study.repo_management.mappers.BatchMapper">
+    <select id="selectByCommodityId" resultType="cn.lhx.study.repo_management.entities.Batch">
+        select * from batch where cid=#{cid};
+    </select>
+
+    <select id="queryByWarehouseId" resultType="cn.lhx.study.repo_management.entities.Batch">
+        select * from batch where wid=#{wid};
+    </select>
+
+    <select id="queryByQuantityRange" resultType="cn.lhx.study.repo_management.entities.Batch">
+        select * from batch where quantity >= #{from} and quantity &lt;= #{to};
+    </select>
+
+    <delete id="deleteRecord">
+        delete from batch where cid=#{cid} and wid=#{wid};
+    </delete>
+
+    <insert id="insert">
+        insert into batch(cid,wid,quantity) values (#{cid},#{wid},#{quantity});
+    </insert>
+
+    <update id="addQuantity">
+        update batch set quantity=quantity+#{quantity} where cid=#{cid} and wid=#{wid};
+    </update>
+    
+    <update id="minusQuantity">
+        update batch set quantity=quantity-#{quantity} where cid=#{cid} and wid=#{wid};
+    </update>
+
+    <select id="queryByWidAndCid" resultType="cn.lhx.study.repo_management.entities.Batch">
+        select * from batch where cid=#{cid} and wid=#{wid};
+    </select>
+
+</mapper>

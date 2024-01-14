@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="https://www.thymeleaf.org/">
+<head>
+    <meta charset="UTF-8">
+    <title>写用户工作区</title>
+</head>
+<body>
+ <span id="show-name" th:text="${session.user.username}"></span>
+ <p></p>
+ <div id="choose-operation">
+     <a href="/commodity_management">货种管理</a>
+     <a href="/warehouse_management">库房信息</a>
+     <a href="/inventory">在库存货管理</a>
+ </div>
+
+</body>
+</html>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.lhx.study.repo_management.mappers.WarehouseMapper">
+    <select id="selectById" resultType="cn.lhx.study.repo_management.entities.Warehouse">
+        select * from warehouse where wid=#{wid};
+    </select>
+    <select id="selectByAddrLike" resultType="cn.lhx.study.repo_management.entities.Warehouse">
+        select * from warehouse where addr like #{like};
+    </select>
+
+    <delete id="delete">
+        delete from warehouse where wid=#{wid};
+    </delete>
+
+    <select id="selectByAddr" resultType="cn.lhx.study.repo_management.entities.Warehouse">
+        select * from warehouse where addr=#{addr};
+    </select>
+
+    <update id="modify">
+        update warehouse set addr=#{addr} where wid=#{wid};
+    </update>
+
+    <insert id="insert">
+        insert into warehouse(addr) values (#{addr});
+    </insert>
+</mapper>

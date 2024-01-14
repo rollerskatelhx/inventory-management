@@ -1,0 +1,20 @@
+server:
+  port: 8080
+
+mybatis:
+  mapper-locations: classpath:/cn/lhx/study/repo_management/mappers/*.xml
+
+spring:
+  datasource:
+    driverClassName: com.mysql.cj.jdbc.Driver
+    password: tlso3990390
+    url: jdbc:mysql://localhost:3306/repo_management
+    username: root
+  mvc:
+    view:
+      prefix: classpath:/templates/
+      suffix: .html
+  web:
+    resources:
+      chain:
+        cache: true

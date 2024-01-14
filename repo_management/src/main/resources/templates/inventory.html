@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>InventoryBatch</title>
+    <style>
+        .current-page-number{
+            color: red;
+        }
+        ul{
+            list-style-type: none;
+            padding: 0;
+        }
+        li{
+            display: inline-block;
+            margin: 3px;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="/scripts/fetch-page-numbers.js"></script>
+    <script>
+        //配置类型变量
+        let PAGE_SIZE=2
+        //辅助类型变量
+        let prospectiveDeleteWarehouseId=0
+        let prospectiveDeleteCommodityId=0
+        let prospectiveTransferOutCid=0
+        let prospectiveTransferOutSourceWid=0
+        let prospectiveTransferInCid=0
+        let prospectiveTransferInDestWid=0
+        let latestCallQueryFunctionName=''
+
+        function policyAfterWriteSuccess(){
+            eval(latestCallQueryFunctionName+"(1)")
+        }
+        function display_table_rows(pageObj){
+            let listContainerDiv=document.getElementsByClassName("list-container")[0]
+            while(listContainerDiv.firstChild){
+                listContainerDiv.removeChild(listContainerDiv.firstChild)
+            }
+            let tableElem=document.createElement("table")
+            let pageItemsQuantity=pageObj.itemsOfPage.length
+            for(let i=0;i<pageItemsQuantity;i++){
+                let tableRowElem=document.createElement("tr")
+
+                let th_cid=document.createElement("th")
+                th_cid.innerText=pageObj.itemsOfPage[i].cid
+                tableRowElem.appendChild(th_cid)
+
+                let th_wid=document.createElement("th")
+                th_wid.innerText=pageObj.itemsOfPage[i].wid
+                tableRowElem.appendChild(th_wid)
+
+                let th_quantity=document.createElement("th")
+                th_quantity.innerText=pageObj.itemsOfPage[i].quantity
+                tableRowElem.appendChild(th_quantity)
+
+                let deleteButton=document.createElement("button")
+                deleteButton.innerText="删除"
+                deleteButton.setAttribute("data-toggle","modal")
+                deleteButton.setAttribute("data-target","#sure-delete-modal")
+                //点了某记录的删除按钮，说明用户很可能要删除该记录，因此用prospective变量暂时记录batch记录的主键
+                deleteButton.addEventListener("click",function(){
+                    prospectiveDeleteCommodityId=pageObj.itemsOfPage[i].cid
+                    prospectiveDeleteWarehouseId=pageObj.itemsOfPage[i].wid
+                })
+                tableRowElem.appendChild(deleteButton)
+
+                let outButton=document.createElement("button")
+                outButton.innerText='移出'
+                outButton.setAttribute("data-toggle","modal")
+                outButton.setAttribute("data-target","#inventory-out-modal")
+                outButton.addEventListener("click",function(){
+                    prospectiveTransferOutCid=pageObj.itemsOfPage[i].cid
+                    prospectiveTransferOutSourceWid=pageObj.itemsOfPage[i].wid
+                })
+                tableRowElem.appendChild(outButton)
+
+                let inButton=document.createElement("button")
+                inButton.innerText='移入'
+                inButton.setAttribute("data-toggle","modal")
+                inButton.setAttribute("data-target","#inventory-in-modal")
+                inButton.addEventListener("click",function(){
+                    prospectiveTransferInCid=pageObj.itemsOfPage[i].cid
+                    prospectiveTransferInDestWid=pageObj.itemsOfPage[i].wid
+                })
+                tableRowElem.appendChild(inButton)
+
+                tableElem.appendChild(tableRowElem)
+            }
+            listContainerDiv.appendChild(tableElem)
+        }
+        function denotePositiveInteger(value){
+            if(isNaN(parseFloat(value))){
+                alert("输入非数字，请重试")
+                return false
+            }
+            //让输入0.99的不合法
+            if(Math.floor(parseFloat(value))<1){
+                alert("输入值应>=1")
+                return false
+            }
+            return true
+        }
+        //查询类函数
+        function queryByCommodityIdAndUpdatePage(currentPageNum){
+            //前端校验：cid是表示数字的非空字符串，且为一个正整数
+            let cid=$("#enter_cid").val()
+            if(!denotePositiveInteger(cid)){
+                return
+            }
+            cid=Math.floor(parseFloat(cid))
+            $.post("/batch/queryByCid",
+                {cid:cid,currentPageNumber:currentPageNum,pageSize:PAGE_SIZE},
+                function(json){
+                    json=JSON.parse(json)
+                    if(json.hasOwnProperty("message")){
+                        alert(json.message)
+                        return
+                    }
+                    let pageNumbers=fetch_page_numbers(currentPageNum,json.pageQuantity)
+                    let pageNumsUl=document.getElementsByClassName("page-numbers-ul")[0]
+                    while(pageNumsUl.firstChild){
+                        pageNumsUl.removeChild(pageNumsUl.firstChild)
+                    }
+                    for(let pageNumber of pageNumbers){
+                        let li=document.createElement("li")
+                        let a=document.createElement("a")
+                        if(pageNumber==currentPageNum){
+                            a.setAttribute("class","current-page-number")
+                        }
+                        a.innerText=pageNumber
+                        a.addEventListener('click',function(){queryByCommodityIdAndUpdatePage(pageNumber)})
+                        li.appendChild(a)
+                        pageNumsUl.appendChild(li)
+                    }
+                    display_table_rows(json)
+                    latestCallQueryFunctionName='queryByCommodityIdAndUpdatePage'
+                }
+            )
+
+        }
+        function queryByWarehouseIdAndUpdatePage(currentPageNum){
+            let wid=$("#enter_wid").val()
+            if(!denotePositiveInteger(wid)){
+                return
+            }
+            wid=Math.floor(parseFloat(wid))
+            $.post("/batch/queryByWid",
+                {wid:wid,currentPageNumber:currentPageNum,pageSize:PAGE_SIZE},
+                function(json){
+                    json=JSON.parse(json)
+                    if(json.hasOwnProperty("message")){
+                        alert(json.message)
+                        return
+                    }
+                    let pageNumbers=fetch_page_numbers(currentPageNum,json.pageQuantity)
+                    let pageNumsUl=document.getElementsByClassName("page-numbers-ul")[0]
+                    while(pageNumsUl.firstChild){
+                        pageNumsUl.removeChild(pageNumsUl.firstChild)
+                    }
+                    for(let pageNumber of pageNumbers){
+                        let li=document.createElement("li")
+                        let a=document.createElement("a")
+                        if(pageNumber==currentPageNum){
+                            a.setAttribute("class","current-page-number")
+                        }
+                        a.innerText=pageNumber
+                        a.addEventListener('click',function(){queryByWarehouseIdAndUpdatePage(pageNumber)})
+                        li.appendChild(a)
+                        pageNumsUl.appendChild(li)
+                    }
+                    display_table_rows(json)
+                    latestCallQueryFunctionName='queryByWarehouseIdAndUpdatePage'
+                }
+            )
+
+        }
+        function queryByQuantityRangeAndUpdatePage(currentPageNum){
+            ////前端已校验过from和to都是表示数字的非空字符串，且为一个整数，另外，保证to严格大于from.
+            let from=$("#enter_from").val()
+            let to=$("#enter_to").val()
+            if(isNaN(parseFloat(from))||isNaN(parseFloat(to))){
+                alert("输入非数字，请重试")
+                return
+            }
+            from=Math.floor(parseFloat(from))
+            to=Math.floor(parseFloat(to))
+            if(to<=from){
+                alert("to<=from")
+                return
+            }
+            $.post("/batch/queryByQuantityRange",
+                {from:from,to:to,currentPageNumber:currentPageNum,pageSize:PAGE_SIZE},
+                function(json){
+                    json=JSON.parse(json)
+                    if(json.hasOwnProperty("message")){
+                        alert(json.message)
+                        return
+                    }
+                    let pageNumbers=fetch_page_numbers(currentPageNum,json.pageQuantity)
+                    let pageNumsUl=document.getElementsByClassName("page-numbers-ul")[0]
+                    while(pageNumsUl.firstChild){
+                        pageNumsUl.removeChild(pageNumsUl.firstChild)
+                    }
+                    for(let pageNumber of pageNumbers){
+                        let li=document.createElement("li")
+                        let a=document.createElement("a")
+                        if(pageNumber==currentPageNum){
+                            a.setAttribute("class","current-page-number")
+                        }
+                        a.innerText=pageNumber
+                        a.addEventListener('click',function(){queryByQuantityRangeAndUpdatePage(pageNumber)})
+                        li.appendChild(a)
+                        pageNumsUl.appendChild(li)
+                    }
+                    display_table_rows(json)
+                    latestCallQueryFunctionName='queryByQuantityRangeAndUpdatePage'
+                }
+            )
+
+        }
+        //写类函数
+        function sureDelete(){
+            $.post("/batch/delete",{cid:prospectiveDeleteCommodityId,wid:prospectiveDeleteWarehouseId},
+                function(json){
+                alert(json)
+                json=JSON.parse(json)
+                if(json.success==true){
+                    policyAfterWriteSuccess()
+                }
+            })
+        }
+        function sureInsert(){
+            let insert_cid=$("#enter_insert_cid").val()
+            let insert_wid=$("#enter_insert_wid").val()
+            let insert_quantity=$("#enter_insert_quantity").val()
+            let allPositiveInteger=denotePositiveInteger(insert_cid)&&denotePositiveInteger(insert_wid)&&denotePositiveInteger(insert_quantity)
+            if(!allPositiveInteger){
+                alert("其中一个输入不是正整数，请重试")
+                return
+            }
+            insert_cid=Math.floor(parseFloat(insert_cid))
+            insert_wid=Math.floor(parseFloat(insert_wid))
+            insert_quantity=Math.floor(parseFloat(insert_quantity))
+            $.post("/batch/insert",{cid:insert_cid,wid:insert_wid,quantity:insert_quantity},function(json){
+                alert(json)
+                document.getElementById("init-page").submit()
+            })
+            
+        }
+        function sureTransferOut(){
+            let outQuantity=$("#enter_out_quantity").val()
+            let destWarehouse=$("#enter_destination").val()
+            if(!denotePositiveInteger(outQuantity)){
+                alert("移出量输入不合法")
+                return
+            }
+            outQuantity=Math.floor(parseFloat(outQuantity))
+            if(destWarehouse==""||destWarehouse==null||denotePositiveInteger(destWarehouse)){
+                if(destWarehouse!=""&&destWarehouse!=null){
+                    destWarehouse=Math.floor(parseFloat(destWarehouse))
+                }
+                let params=
+                    {source_wid:prospectiveTransferOutSourceWid,
+                     dest_wid:destWarehouse,
+                     cid:prospectiveTransferOutCid,
+                     transferQuantity:outQuantity
+                    }
+                $.post("/batch/inventoryOut",params,function(json){
+                    alert(json)
+                    json=JSON.parse(json)
+                    if(json.success==true){
+                        policyAfterWriteSuccess()
+                    }
+                })
+            }else{
+                alert("目的地id输入不合法")
+            }
+        }
+
+        function sureTransferIn(){
+            let inQuantity=$("#enter_in_quantity").val()
+            let sourceWarehouse=$("#enter_source").val()
+            if(!denotePositiveInteger(inQuantity)){
+                alert("移入量输入不合法")
+                return
+            }
+            inQuantity=Math.floor(parseFloat(inQuantity))
+            if(sourceWarehouse==""||sourceWarehouse==null||denotePositiveInteger(sourceWarehouse)){
+                if(sourceWarehouse!=""&&sourceWarehouse!=null){
+                    sourceWarehouse=Math.floor(parseFloat(sourceWarehouse))
+                }
+                let params=
+                    {source_wid:sourceWarehouse,
+                        dest_wid:prospectiveTransferInDestWid,
+                        cid:prospectiveTransferInCid,
+                        transferQuantity:inQuantity
+                    }
+                $.post("/batch/inventoryIn",params,function(json){
+                    alert(json)
+                    json=JSON.parse(json)
+                    if(json.success==true){
+                        policyAfterWriteSuccess()
+                    }
+                })
+            }else{
+                alert("目的地id输入不合法")
+            }
+        }
+    </script>
+</head>
+<body>
+  <div class="query-area">
+    <button class="btn btn-primary" data-toggle="modal" data-target="#queryByWarehouseId">
+        按库房id搜
+    </button>
+    <button class="btn btn-primary" data-toggle="modal" data-target="#queryByCommodityId">
+        按货种id搜
+    </button>
+    <button class="btn btn-primary" data-toggle="modal" data-target="#queryByQuantityRange">
+        按存量范围搜
+    </button>
+  </div>
+
+  <div>
+    <button class="btn btn-primary" data-toggle="modal" data-target="#insert-modal">
+        追加记录
+    </button>
+  </div>
+
+  <div class="list-container">
+
+  </div>
+
+  <form id="init-page" action="/inventory">
+
+  </form>
+
+  <div class="page-num-group-container">
+    <ul class="page-numbers-ul">
+
+    </ul>
+  </div>
+
+  <div class="modal" id="queryByCommodityId">
+      <div class="modal-dialog">
+          <div class="modal-content">
+              <!-- Modal Header -->
+              <div class="modal-header">
+                  <h4 class="modal-title">按货种id搜记录</h4>
+              </div>
+              <!-- Modal Body -->
+              <div class="modal-body">
+                  <div class="embedded-form">
+                      <label>货种id：</label>
+                      <input type="text" id="enter_cid">
+                      <input type="button" data-dismiss="modal" value="搜索" onclick="queryByCommodityIdAndUpdatePage(1)">
+                  </div>
+              </div>
+              <!-- Modal Footer -->
+              <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <div class="modal" id="queryByWarehouseId">
+      <div class="modal-dialog">
+          <div class="modal-content">
+              <!-- Modal Header -->
+              <div class="modal-header">
+                  <h4 class="modal-title">按库房id搜记录</h4>
+              </div>
+              <!-- Modal Body -->
+              <div class="modal-body">
+                  <div class="embedded-form">
+                      <label>库房id：</label>
+                      <input type="text" id="enter_wid">
+                      <input type="button" data-dismiss="modal" value="搜索" onclick="queryByWarehouseIdAndUpdatePage(1)">
+                  </div>
+              </div>
+              <!-- Modal Footer -->
+              <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <div class="modal" id="queryByQuantityRange">
+      <div class="modal-dialog">
+          <div class="modal-content">
+              <!-- Modal Header -->
+              <div class="modal-header">
+                  <h4 class="modal-title">按存量范围搜记录</h4>
+              </div>
+              <!-- Modal Body -->
+              <div class="modal-body">
+                  <div class="embedded-form">
+                      <label>from：</label>
+                      <input type="text" id="enter_from">
+                      <label>to：</label>
+                      <input type="text" id="enter_to">
+                      <input type="button" data-dismiss="modal" value="搜索" onclick="queryByQuantityRangeAndUpdatePage(1)">
+                  </div>
+              </div>
+              <!-- Modal Footer -->
+              <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <div class="modal" id="insert-modal">
+      <div class="modal-dialog">
+          <div class="modal-content">
+              <!-- Modal Header -->
+              <div class="modal-header">
+                  <h4 class="modal-title">增加记录</h4>
+              </div>
+              <!-- Modal Body -->
+              <div class="modal-body">
+                  <div class="embedded-form">
+                      <label>货种id为：</label>
+                      <input type="text" id="enter_insert_cid">
+                      <label>库房id为：</label>
+                      <input type="text" id="enter_insert_wid">
+                      <label>存量为：</label>
+                      <input type="text" id="enter_insert_quantity">
+                      <input type="button" data-dismiss="modal" onclick="sureInsert()" value="确认增加">
+                  </div>
+              </div>
+              <!-- Modal Footer -->
+              <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <div class="modal" id="sure-delete-modal">
+      <div class="modal-dialog">
+          <div class="modal-content">
+              <!-- Modal Header -->
+              <div class="modal-header">
+                  <h4 class="modal-title">删除确认</h4>
+              </div>
+              <!-- Modal Body -->
+              <div class="modal-body">
+                  <div class="embedded-form">
+                      <label>确认删除此batch记录？</label>
+                      <input type="button" data-dismiss="modal" onclick="sureDelete()" value="确认删除">
+                  </div>
+              </div>
+              <!-- Modal Footer -->
+              <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <div class="modal" id="inventory-out-modal">
+      <div class="modal-dialog">
+          <div class="modal-content">
+              <!-- Modal Header -->
+              <div class="modal-header">
+                  <h4 class="modal-title">移出一定数量存货至</h4>
+              </div>
+              <!-- Modal Body -->
+              <div class="modal-body">
+                  <div class="embedded-form">
+                      <label>目的库房id：</label>
+                      <input type="text" id="enter_destination">
+                      <label>货物转移量：</label>
+                      <input type="text" id="enter_out_quantity">
+                      <input type="button" data-dismiss="modal" onclick="sureTransferOut()" value="确认修改">
+                  </div>
+              </div>
+              <!-- Modal Footer -->
+              <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <div class="modal" id="inventory-in-modal">
+      <div class="modal-dialog">
+          <div class="modal-content">
+              <!-- Modal Header -->
+              <div class="modal-header">
+                  <h4 class="modal-title">从某库移入存量：</h4>
+              </div>
+              <!-- Modal Body -->
+              <div class="modal-body">
+                  <div class="embedded-form">
+                      <label>源库房id：</label>
+                      <input type="text" id="enter_source">
+                      <label>货物转移量：</label>
+                      <input type="text" id="enter_in_quantity">
+                      <input type="button" data-dismiss="modal" onclick="sureTransferIn()" value="确认修改">
+                  </div>
+              </div>
+              <!-- Modal Footer -->
+              <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+</body>
+</html>

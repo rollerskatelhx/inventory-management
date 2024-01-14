@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.lhx.study.repo_management.mappers.CommodityMapper">
+    <select id="selectById" resultType="cn.lhx.study.repo_management.entities.Commodity">
+        select * from commodity where cid=#{cid};
+    </select>
+    <select id="selectByNameLike" resultType="cn.lhx.study.repo_management.entities.Commodity">
+        select * from commodity where name like #{like};
+    </select>
+
+    <delete id="delete">
+        delete from commodity where cid=#{cid};
+    </delete>
+
+    <select id="selectByName" resultType="cn.lhx.study.repo_management.entities.Commodity">
+        select * from commodity where name=#{name};
+    </select>
+
+    <update id="modify">
+        update commodity
+        <set>
+            <if test="name != null and name != ''">
+                name = #{name}
+            </if>
+            <if test="unit_price > 0">
+                <if test="name != null and name != ''">
+                    ,
+                </if>
+                unit_price = #{unit_price}
+            </if>
+        </set>
+        where cid = #{cid};
+    </update>
+
+    <insert id="insert">
+        insert into commodity(name,unit_price) values (#{name},#{unit_price});
+    </insert>
+</mapper>

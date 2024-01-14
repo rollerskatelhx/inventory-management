@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>库房信息管理</title>
+    <style>
+        .current-page-number{
+            color: red;
+        }
+        ul{
+            list-style-type: none;
+            padding: 0;
+        }
+        li{
+            display: inline-block;
+            margin: 3px;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="/scripts/fetch-page-numbers.js"></script>
+    <script>
+        //配置类型变量
+        let PAGE_SIZE=2
+        //辅助类型变量
+        let prospectiveDeleteWarehouseId=0
+        let prospectiveModifyWarehouseId=0
+        let latestCallQueryFunctionName=''
+
+        function policyAfterWriteSuccess(){
+            eval(latestCallQueryFunctionName+"(1)")
+        }
+        function display_table_rows(pageObj){
+            let listContainerDiv=document.getElementsByClassName("list-container")[0]
+            while(listContainerDiv.firstChild){
+                listContainerDiv.removeChild(listContainerDiv.firstChild)
+            }
+            let tableElem=document.createElement("table")
+            let pageItemsQuantity=pageObj.itemsOfPage.length
+            for(let i=0;i<pageItemsQuantity;i++){
+                let tableRowElem=document.createElement("tr")
+
+                let th_wid=document.createElement("th")
+                th_wid.innerText=pageObj.itemsOfPage[i].wid
+                tableRowElem.appendChild(th_wid)
+
+                let th_addr=document.createElement("th")
+                th_addr.innerText=pageObj.itemsOfPage[i].addr
+                tableRowElem.appendChild(th_addr)
+
+                let deleteButton=document.createElement("button")
+                deleteButton.innerText="删除"
+                deleteButton.setAttribute("data-toggle","modal")
+                deleteButton.setAttribute("data-target","#sure-delete-modal")
+                //点了某记录的删除按钮，说明用户很可能要删除该记录，因此用prospective变量暂时记录batch记录的主键
+                deleteButton.addEventListener("click",function(){
+                    prospectiveDeleteWarehouseId=pageObj.itemsOfPage[i].wid
+                })
+                tableRowElem.appendChild(deleteButton)
+
+                let outButton=document.createElement("button")
+                outButton.innerText='修改'
+                outButton.setAttribute("data-toggle","modal")
+                outButton.setAttribute("data-target","#modify-modal")
+                outButton.addEventListener("click",function(){
+                    prospectiveModifyWarehouseId=pageObj.itemsOfPage[i].wid
+                })
+                tableRowElem.appendChild(outButton)
+
+                tableElem.appendChild(tableRowElem)
+            }
+            listContainerDiv.appendChild(tableElem)
+        }
+        function denotePositiveInteger(value){
+            if(isNaN(parseFloat(value))){
+                alert("输入非数字，请重试")
+                return false
+            }
+            //让输入0.99的不合法
+            if(Math.floor(parseFloat(value))<1){
+                alert("输入值应>=1")
+                return false
+            }
+            return true
+        }
+        //查询类函数
+        function queryByAddrKeywordAndUpdatePage(currentPageNum){
+            //前端校验：cid是表示数字的非空字符串，且为一个正整数
+            let addrKeyword=$("#enter_keyword").val()
+
+            $.post("/warehouse/select_by_keyword",
+                {keyword:addrKeyword,currentPageNumber:currentPageNum,pageSize:PAGE_SIZE},
+                function(json){
+                    json=JSON.parse(json)
+                    if(json.hasOwnProperty("message")){
+                        alert(json.message)
+                        return
+                    }
+                    let pageNumbers=fetch_page_numbers(currentPageNum,json.pageQuantity)
+                    let pageNumsUl=document.getElementsByClassName("page-numbers-ul")[0]
+                    while(pageNumsUl.firstChild){
+                        pageNumsUl.removeChild(pageNumsUl.firstChild)
+                    }
+                    for(let pageNumber of pageNumbers){
+                        let li=document.createElement("li")
+                        let a=document.createElement("a")
+                        if(pageNumber==currentPageNum){
+                            a.setAttribute("class","current-page-number")
+                        }
+                        a.innerText=pageNumber
+                        a.addEventListener('click',function(){queryByAddrKeywordAndUpdatePage(pageNumber)})
+                        li.appendChild(a)
+                        pageNumsUl.appendChild(li)
+                    }
+                    display_table_rows(json)
+                    latestCallQueryFunctionName='queryByAddrKeywordAndUpdatePage'
+                }
+            )
+
+        }
+        function queryByWarehouseId(currentPageNum){
+            let wid=$("#enter_wid").val()
+            if(!denotePositiveInteger(wid)){
+                alert("输入不合法")
+                return
+            }
+            wid=Math.floor(parseFloat(wid))
+            $.post("/warehouse/selectById",{wid:wid},function(json){
+                json=JSON.parse(json)
+                if(json.hasOwnProperty("message")){
+                    alert(json.message)
+                    return
+                }
+                let pageNumbers=fetch_page_numbers(currentPageNum,json.pageQuantity)
+                let pageNumsUl=document.getElementsByClassName("page-numbers-ul")[0]
+                while(pageNumsUl.firstChild){
+                    pageNumsUl.removeChild(pageNumsUl.firstChild)
+                }
+                for(let pageNumber of pageNumbers){
+                    let li=document.createElement("li")
+                    let a=document.createElement("a")
+                    if(pageNumber==currentPageNum){
+                        a.setAttribute("class","current-page-number")
+                    }
+                    a.innerText=pageNumber
+                    li.appendChild(a)
+                    pageNumsUl.appendChild(li)
+                }
+                display_table_rows(json)
+                latestCallQueryFunctionName='queryByWarehouseId'
+            })
+
+        }
+
+        //写类函数
+        function sureDelete(){
+            $.post("/warehouse/delete",{wid:prospectiveDeleteWarehouseId},
+                function(json){
+                    alert(json)
+                    json=JSON.parse(json)
+                    if(json.success==true){
+                        policyAfterWriteSuccess()
+                    }
+                })
+        }
+        function sureInsert(){
+            let insert_addr=$("#enter_insert_addr").val()
+            if(insert_addr==null||insert_addr==""){
+                alert("地址不能为空")
+                return
+            }
+            $.post("/warehouse/insert",{addr:insert_addr},function(json){
+                alert(json)
+                document.getElementById("init-page").submit()
+            })
+
+        }
+        function sureModify(){
+            let addr=$("#enter_modify_addr").val()
+            if(addr==null||addr==""){
+                alert("输入不合法")
+                return
+            }
+            $.post("/warehouse/modify",{wid:prospectiveModifyWarehouseId,addr:addr},function(json){
+                alert(json)
+                json=JSON.parse(json)
+                if(json.success==true){
+                    policyAfterWriteSuccess()
+                }
+            })
+        }
+
+
+    </script>
+</head>
+<body>
+<div class="query-area">
+    <button class="btn btn-primary" data-toggle="modal" data-target="#queryByWarehouseId">
+        按库房id搜
+    </button>
+
+    <button class="btn btn-primary" data-toggle="modal" data-target="#queryByAddrKeyword">
+        按地址关键字搜
+    </button>
+
+</div>
+
+<div>
+    <button class="btn btn-primary" data-toggle="modal" data-target="#insert-modal">
+        追加记录
+    </button>
+</div>
+
+<div class="list-container">
+
+</div>
+
+<form id="init-page" action="/warehouse_management">
+
+</form>
+
+<div class="page-num-group-container">
+    <ul class="page-numbers-ul">
+
+    </ul>
+</div>
+
+<div class="modal" id="queryByWarehouseId">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <!-- Modal Header -->
+            <div class="modal-header">
+                <h4 class="modal-title">按库房id搜记录</h4>
+            </div>
+            <!-- Modal Body -->
+            <div class="modal-body">
+                <div class="embedded-form">
+                    <label>库房id：</label>
+                    <input type="text" id="enter_wid">
+                    <input type="button" data-dismiss="modal" value="搜索" onclick="queryByWarehouseId(1)">
+                </div>
+            </div>
+            <!-- Modal Footer -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="queryByAddrKeyword">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <!-- Modal Header -->
+            <div class="modal-header">
+                <h4 class="modal-title">按库房地址关键字搜记录</h4>
+            </div>
+            <!-- Modal Body -->
+            <div class="modal-body">
+                <div class="embedded-form">
+                    <label>地址关键字：</label>
+                    <input type="text" id="enter_keyword">
+                    <input type="button" data-dismiss="modal" value="搜索" onclick="queryByAddrKeywordAndUpdatePage(1)">
+                </div>
+            </div>
+            <!-- Modal Footer -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="modify-modal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <!-- Modal Header -->
+            <div class="modal-header">
+                <h4 class="modal-title">修改记录</h4>
+            </div>
+            <!-- Modal Body -->
+            <div class="modal-body">
+                <div class="embedded-form">
+                    <label>库房地址改为：</label>
+                    <input type="text" id="enter_modify_addr">
+                    <input type="button" id="sure-modify-button" data-dismiss="modal" onclick="sureModify()" value="确认修改">
+                </div>
+            </div>
+            <!-- Modal Footer -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="insert-modal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <!-- Modal Header -->
+            <div class="modal-header">
+                <h4 class="modal-title">增加记录</h4>
+            </div>
+            <!-- Modal Body -->
+            <div class="modal-body">
+                <div class="embedded-form">
+                    <label>库房地址为：</label>
+                    <input type="text" id="enter_insert_addr">
+                    <input type="button" data-dismiss="modal" onclick="sureInsert()" value="确认增加">
+                </div>
+            </div>
+            <!-- Modal Footer -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="sure-delete-modal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <!-- Modal Header -->
+            <div class="modal-header">
+                <h4 class="modal-title">删除确认</h4>
+            </div>
+            <!-- Modal Body -->
+            <div class="modal-body">
+                <div class="embedded-form">
+                    <label>确认删除此库房记录？</label>
+                    <input type="button" data-dismiss="modal" onclick="sureDelete()" value="确认删除">
+                </div>
+            </div>
+            <!-- Modal Footer -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+</body>
+</html>
